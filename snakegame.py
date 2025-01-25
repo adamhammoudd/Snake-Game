@@ -11,7 +11,7 @@ import math
 pygame.init() # Initialize Pygame
 
 # Path to the high scores file
-high_scores_path = os.path.join(os.path.dirname("~"), "high_scores.json")
+high_scores_path = os.path.join(os.path.expanduser("~"), "high_scores.json")
 
 # Constants
 WIDTH, HEIGHT = 800, 600 # The width and height of the window
@@ -48,23 +48,17 @@ snake_body = [
                 [70, 50]
             ]
 
+# Fruit class
 class Fruit:
-    # Constants
-    COLOR = (255, 0, 0)  # Red color
-
-    # Constructor
     def __init__(self, x, y):
-        self.x = x # The x-coordinate of the target
-        self.y = y # The y-coordinate of the target
-    
-    # Function to draw the target    
+        self.x = x
+        self.y = y
+
     def draw(self, win):
-        pygame.draw.rect(win, self.COLOR,
-                        pygame.Rect(self.x, self.y, 10, 10)) # Draw the fruit
+        pygame.draw.rect(win, (255, 0, 0), pygame.Rect(self.x, self.y, GRID_SIZE, GRID_SIZE))
 
     def collide(self, x, y):
-        dis = math.sqrt((self.x - x)**2 + (self.y - y)**2) # Calculate the distance between the fruit and the snake
-        return dis < 10  # Return True if the distance is less than the size of the target
+        return self.x == x and self.y == y
 
 # Setting default snake direction towards the right
 direction = 'RIGHT'
@@ -173,15 +167,15 @@ def home_screen(win):
                     user_input += event.unicode # Add the character to the user input
 
 # Function to display the end screen
-def end_screen(win, elapsed_time, player_name, high_scores, score):
+def end_screen(win, elapsed_time, score, player_name, high_scores, high_scores_dic):
     win.fill(BG_COLOR)
 
     # Update high score for the current player
-    if player_name in high_scores:
-        if score > high_scores[player_name]:
-            high_scores[player_name] = score  # Update the high score
+    if player_name in high_scores_dic:
+        if score > high_scores_dic[player_name]:
+            high_scores[player_name] = (score) # Update the high score
     else:
-        high_scores[player_name] = score  # Add the player to the high scores
+        high_scores[player_name] = (score) # Add the player to the high scores
 
     # Save the updated high scores
     save_high_scores()
@@ -200,10 +194,10 @@ def end_screen(win, elapsed_time, player_name, high_scores, score):
 
     # Render high scores
     high_scores_label = H1_FONT.render("High Scores", 1, TEXT_COLOR)
-    sorted_scores = sorted(high_scores.items(), key=lambda x: x[1], reverse=True)  # Sort by score
+    sorted_scores = sorted(high_scores_dic.items(), key=lambda x: x[1], reverse=True)  # Sort by score
     win.blit(high_scores_label, ((750 - high_scores_label.get_width() // 2) - (high_scores_label.get_width() - high_scores_label.get_width() // 2), 100))
-    for idx, (player_name, score) in enumerate(sorted_scores):
-        score_label = LABEL_FONT.render(f"{idx + 1}. {player_name}: {score}", 1, TEXT_COLOR)  # Render the high scores
+    for idx, (player_name, high_scores) in enumerate(sorted_scores):
+        score_label = LABEL_FONT.render(f"{idx + 1}. {player_name}: {high_scores}", 1, TEXT_COLOR)  # Render the high scores
         win.blit(score_label, ((700 - high_scores_label.get_width() // 2) - (high_scores_label.get_width() - high_scores_label.get_width() // 2), win.get_height() // 2 - 100 + idx * 30))  # Position the high scores
         if idx + 1 == 5:
             win.blit(LABEL_FONT.render("", 1, TEXT_COLOR), (850, 200 + (idx + 1) * 30))  # Render the ellipsis
@@ -227,6 +221,16 @@ def end_screen(win, elapsed_time, player_name, high_scores, score):
     win.blit(reset_high_score_button_text, (reset_high_score_button_x + reset_high_score_button_width // 2 - reset_high_score_button_text.get_width() // 2, 
                                reset_high_score_button_y + reset_high_score_button_height // 2 - reset_high_score_button_text.get_height() // 2)) # Position the button
 
+    # Restart High Score Button
+    restart_button_width, restart_button_height = 150, 50
+    restart_button_x = 50
+    restart_button_y = 500
+    pygame.draw.rect(win, TEXT_COLOR, (restart_button_x, restart_button_y, restart_button_width, restart_button_height)) # Draw the button
+    restart_button_text = LABEL_FONT.render("Restart", 1, "white")
+    win.blit(restart_button_text, (restart_button_x + restart_button_width // 2 - restart_button_text.get_width() // 2, 
+                               restart_button_y + restart_button_height // 2 - restart_button_text.get_height() // 2)) # Position the button
+
+
     pygame.display.update()  # Update the display
 
     run_end = True  # Run the end screen
@@ -245,6 +249,10 @@ def end_screen(win, elapsed_time, player_name, high_scores, score):
                 if main_button_x <= mouse_x <= main_button_x + main_button_width and main_button_y <= mouse_y <= main_button_y + main_button_height:
                     run_end = False  # Exit the loop
                     start_game()  # Goes back to home screen
+                    
+                if restart_button_x <= mouse_x <= restart_button_x + restart_button_width and restart_button_y <= mouse_y <= restart_button_y + restart_button_height:
+                    run_end = False  # Exit the loop
+                    main(WIN)  # Goes back to home screen
 
                 # Reset High Score Button
                 if reset_high_score_button_x <= mouse_x <= reset_high_score_button_x + reset_high_score_button_width and reset_high_score_button_y <= mouse_y <= reset_high_score_button_y + reset_high_score_button_height:
@@ -294,7 +302,7 @@ def end_screen(win, elapsed_time, player_name, high_scores, score):
                             if event.type == pygame.MOUSEBUTTONDOWN:
                                 mouse_x, mouse_y = pygame.mouse.get_pos()  # Get the mouse position
                                 if yes_button_x <= mouse_x <= yes_button_x + yes_button_width and yes_button_y <= mouse_y <= yes_button_y + yes_button_height:
-                                    high_scores.clear()  # Clear the high scores
+                                    high_scores_dic.clear()  # Clear the high scores
                                     save_high_scores()  # Save the empty high scores
                                     confirm_reset = False  # Confirms the reset
                                     run_end = False  # Exit the loop
@@ -303,18 +311,19 @@ def end_screen(win, elapsed_time, player_name, high_scores, score):
                                 # No Button
                                 if no_button_x <= mouse_x <= no_button_x + no_button_width and no_button_y <= mouse_y <= no_button_y + no_button_height:
                                     confirm_reset = False  # Doesn't confirm the reset
-                                    end_screen(win, elapsed_time, player_name, high_scores, score)  # Display the end screen
+                                    end_screen(win, elapsed_time, score, player_name, high_scores, high_scores_dic)  # Display the end screen
 
 # Function to get the middle of the screen
 def get_middle(surface):
     return WIDTH / 2 - surface.get_width()/2 # Return the middle of the screen
 
+# Function to load high scores from a JSON file
 def load_high_scores():
-    global high_scores
+    # Global variables
+    global high_scores 
     try:
         with open(high_scores_path, "r") as file:
             high_scores = json.load(file) # Load the high scores from the file
-            # Ensure all values are integers
             high_scores = {player: int(data[0]) if isinstance(data, list) else int(data) for player, data in high_scores.items()}
     except FileNotFoundError:
         high_scores = {} # Create an empty dictionary if the file does not exist
@@ -355,21 +364,19 @@ def main(win):
         [80, 50],
         [70, 50]
     ]
-    fruits_pos = [spawn_fruit()]  # Start with one fruit
+    fruits_pos = [spawn_fruit()]
 
-    clock = pygame.time.Clock()  # Create a clock object to control the frame rate
+    clock = pygame.time.Clock()
 
-    run = True  # Run the game
+    run = True
 
-    # Main loop
     while run:
-        elapsed_time = time.time() - start_time  # Calculate the elapsed time
-        clock.tick(snake_speed)  # Control the frame rate
-        # Event Handling
+        elapsed_time = time.time() - start_time
+        clock.tick(snake_speed)
+
         for event in pygame.event.get():
-            # Handle window close button
             if event.type == pygame.QUIT:
-                run = False  # Exit the game
+                run = False
                 break
 
             if event.type == pygame.KEYDOWN:
@@ -382,7 +389,6 @@ def main(win):
                 if event.key == pygame.K_RIGHT:
                     change_to = 'RIGHT'
 
-        # If the player hits the fruit
         if change_to == "UP" and direction != "DOWN":
             direction = "UP"
         if change_to == "DOWN" and direction != "UP":
@@ -392,7 +398,6 @@ def main(win):
         if change_to == "RIGHT" and direction != "LEFT":
             direction = "RIGHT"
 
-        # Move the snake
         if direction == "UP":
             snake_pos[1] -= GRID_SIZE
         if direction == "DOWN":
@@ -402,44 +407,53 @@ def main(win):
         if direction == "RIGHT":
             snake_pos[0] += GRID_SIZE
 
-        snake_body.insert(0, list(snake_pos))  # Insert the snake position to the snake body
-        
+        snake_body.insert(0, list(snake_pos))
+
         for fruit_pos in fruits_pos:
             if fruit_pos.collide(*snake_pos):
-                fruits_pos.remove(fruit_pos)  # Remove the target
+                fruits_pos.remove(fruit_pos)
                 score += 10
-                snake_speed += 1  # Increase the speed gradually
-                fruits_pos.append(spawn_fruit())  # Spawn a new fruit
-                if score % 50 == 0:  # Gradually increase the number of fruits
+                snake_speed += 1
+                fruits_pos.append(spawn_fruit())
+                if score % 50 == 0:
                     fruits_pos.append(spawn_fruit())
                 break
         else:
-            snake_body.pop()  # Remove the last element of the snake body
+            snake_body.pop()
 
-        # Touching the snake body
         for block in snake_body[1:]:
             if snake_pos[0] == block[0] and snake_pos[1] == block[1]:
-                end_screen(WIN, elapsed_time, player_name, high_scores, high_scores, score)  # Display the end screen
+                end_screen(WIN, elapsed_time, score, player_name, high_scores, high_scores)
                 run = False
                 break
-        # Touching the boundaries
+
         if snake_pos[0] >= WIDTH or snake_pos[0] < 0 or snake_pos[1] >= HEIGHT or snake_pos[1] < TOP_BAR_HEIGHT:
-            end_screen(WIN, elapsed_time, player_name, high_scores, score)
+            end_screen(WIN, elapsed_time, score, player_name, high_scores, high_scores)
             run = False
             break
 
-        win.fill(BG_COLOR)  # Fill the window with the background color
+        win.fill(BG_COLOR)
         for pos in snake_body:
-            pygame.draw.rect(win, (0, 255, 0), pygame.Rect(pos[0], pos[1], GRID_SIZE, GRID_SIZE))  # Draw the snake
+            pygame.draw.rect(win, TEXT_COLOR, pygame.Rect(pos[0], pos[1], GRID_SIZE, GRID_SIZE))
+
+        # Draw eyes on the head of the snake
+        head_pos = snake_body[0]
+        eye_radius = 2
+        eye_offset_x = 3
+        eye_offset_y = 3
+
+        # Left eye
+        pygame.draw.circle(win, (0, 0, 0), (head_pos[0] + eye_offset_x, head_pos[1] + eye_offset_y), eye_radius)
+        # Right eye
+        pygame.draw.circle(win, (0, 0, 0), (head_pos[0] + GRID_SIZE - eye_offset_x, head_pos[1] + eye_offset_y), eye_radius)
 
         for fruit in fruits_pos:
-            fruit.draw(win)  # Draw the fruits
+            fruit.draw(win)
 
-        draw_top_bar(win, elapsed_time, score)  # Draw the top bar
-        pygame.display.update()  # Update the display
+        draw_top_bar(win, elapsed_time, score)
+        pygame.display.update()
 
     pygame.quit()
-
 # Function to start the game
 def start_game():
     home_screen(WIN)
